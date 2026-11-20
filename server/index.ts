@@ -9,7 +9,9 @@ const SECRET = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
   (()=>{try{const keys=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")||"{}");return keys.default||"";}catch{return "";}})();
 const TABLE = PROJECT_URL + "/rest/v1/tichu_online_rooms";
 const CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const MAX_AGE=1000*60*60*24*7;
+const MAX_AGE=1000*60*60*24*30;
+const HEARTBEAT_GRACE_MS=25_000;
+const PRESENCE=PROJECT_URL+"/rest/v1/tichu_online_presence";
 class ApiError extends Error { status:number; constructor(message:string,status=400){super(message);this.status=status;} }
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{
   "Content-Type":"application/json; charset=utf-8",
@@ -76,6 +78,50 @@ async function commit(row:Row,room:Room){
  if(!Array.isArray(updated)||updated.length!==1)throw new ApiError("Άλλαξε το δωμάτιο. Δοκίμασε ξανά.",409);
  return updated[0] as Row;
 }
+
+/* Seat heartbeat is separate from the saved game/version: a regular
+   heartbeat must never overwrite a concurrent card move. */
+async function presenceData(method:string,query:string,payload?:unknown){
+ if(!SECRET||!PROJECT_URL)throw new ApiError("Δεν έχει ρυθμιστεί ο διακομιστής.",503);
+ const response=await fetch(PRESENCE+query,{
+  method,
+  headers:{"apikey":SECRET,"Authorization":"Bearer "+SECRET,
+   "Content-Type":"application/json","Accept":"application/json",
+   "Prefer":method==="POST"?"resolution=merge-duplicates,return=representation":"return=representation"},
+  body:payload===undefined?undefined:JSON.stringify(payload)
+ });
+ if(!response.ok)throw new ApiError("Δεν ήταν δυνατή η ενημέρωση παρουσίας.",503);
+ return response.json();
+}
+async function seen(code:string,seat:number){
+ await presenceData("POST","?on_conflict=code,seat",{
+  code,seat,connected:true,seen_at:new Date().toISOString()
+ });
+}
+async function disconnected(code:string,seat:number){
+ await presenceData("PATCH","?code=eq."+code+"&seat=eq."+seat,{
+  connected:false,seen_at:new Date().toISOString()
+ });
+}
+async function forgetPresence(code:string,seat:number){
+ await presenceData("DELETE","?code=eq."+code+"&seat=eq."+seat);
+}
+async function missingSeats(room:Room,code:string):Promise<number[]>{
+ if(room.phase!=="active"||!room.game||room.game.stage==="finished")return [];
+ const humans=room.seats.map((s,p)=>s?.kind==="human"?p:-1).filter(p=>p>=0);
+ // A single human with three bots never needs heartbeat/polling to keep playing.
+ if(humans.length<=1)return [];
+ const rows=await presenceData("GET","?select=seat,seen_at,connected&code=eq."+code);
+ const latest=new Map<number,{seen_at:string;connected:boolean}>(
+  (rows as Array<{seat:number;seen_at:string;connected:boolean}>).map(p=>[p.seat,p])
+ );
+ const now=Date.now();
+ return humans.filter(p=>{
+  const presence=latest.get(p);
+  return !presence||!presence.connected||now-Date.parse(presence.seen_at)>HEARTBEAT_GRACE_MS;
+ });
+}
+
 function event(room:Room,message:string){
  room.events=[...room.events.slice(-7),message.slice(0,150)];
 }
@@ -84,12 +130,13 @@ function seatOf(room:Room,digest:string){
 }
 function requiresSeat(idx:number){if(idx<0)throw new ApiError("Πρέπει να καθίσεις σε καρέκλα.",403);}
 function requiresHost(idx:number){if(idx!==0)throw new ApiError("Μόνο ο οικοδεσπότης ξεκινά παρτίδα.",403);}
-function roomView(row:Row,idx:number){
+function roomView(row:Row,idx:number,missing:number[]=[]){
  const r=row.state;
  const g=r.game;
  const seats=r.seats.map((s,i)=>s?{seat:i,kind:s.kind,name:s.name}:null);
  return {
   code:row.code,version:row.version,phase:r.phase,
+  paused:missing.length>0,missingSeats:missing,
   selfSeat:idx,hostSeat:0,seats,events:r.events.slice(-6),
   waiting:idx>=0?{grand:r.grand[String(idx)]!==undefined,trade:!!r.trades[String(idx)]}:null,
   game:g?{
@@ -109,7 +156,10 @@ async function createRoom(who:string){
   const room:Room={phase:"lobby",host:digest,seats:[{kind:"human",name:who,hash:digest},null,null,null],
    game:null,grand:{},trades:{},events:[who+" δημιούργησε το δωμάτιο."]};
   const created=await data("POST","",{code:c,version:1,state:room});
-  if(Array.isArray(created)&&created.length===1)return {...roomView(created[0],0),token};
+  if(Array.isArray(created)&&created.length===1){
+   await seen(c,0);
+   return {...roomView(created[0],0),token};
+  }
  }
  throw new ApiError("Δεν δημιουργήθηκε δωμάτιο. Δοκίμασε ξανά.",503);
 }
@@ -176,7 +226,14 @@ async function handle(body:AnyObject){
  const token=tokenValue(body.token);
  const hash=token?await tokenHash(token):"";
  let idx=seatOf(r,hash);
- if(action==="state")return roomView(row,idx);
+ if(action==="disconnect"){
+  if(idx>=0&&r.seats[idx]?.kind==="human")await disconnected(c,idx);
+  return {ok:true};
+ }
+ if(action==="state"){
+  if(idx>=0&&r.seats[idx]?.kind==="human")await seen(c,idx);
+  return roomView(row,idx,await missingSeats(r,c));
+ }
  if(action==="join"){
   if(r.phase!=="lobby")throw new ApiError("Η παρτίδα έχει ήδη ξεκινήσει.",409);
   const seat=Number(body.seat);
@@ -187,15 +244,41 @@ async function handle(body:AnyObject){
   r.seats[seat]={kind:"human",name:who,hash:digest};
   event(r,who+" κάθισε στη θέση "+seat+".");
   const updated=await commit(row,r);
+  await seen(c,seat);
   return {...roomView(updated,seat),token:secret};
  }
  requiresSeat(idx);
+ await seen(c,idx);
+ if(action==="continue_ai"){
+  if(r.phase!=="active"||!r.game)throw new ApiError("Δεν έχει ξεκινήσει η παρτίδα.",409);
+  const missing=await missingSeats(r,c);
+  const target=Number(body.seat);
+  if(!Number.isInteger(target)||!missing.includes(target)||target===idx)
+   throw new ApiError("Αυτή η καρέκλα δεν είναι διαθέσιμη για αντικατάσταση.",409);
+  const former=r.seats[target];
+  if(!former||former.kind!=="human")throw new ApiError("Η θέση δεν ανήκει σε φίλο.",409);
+  r.seats[target]={kind:"ai",name:former.name+" · AI"};
+  event(r,former.name+" αποσυνδέθηκε. Συνεχίζει υπολογιστής.");
+  if(r.game.stage==="grand"){
+   r.grand[String(target)]=false;
+   prepareGrand(r);
+  }else if(r.game.stage==="trade"){
+   delete r.trades[String(target)];
+   if(allHumanDone(r,r.trades))completeTrades(r);
+  }else if(r.game.stage==="playing"){
+   bots(r);
+  }
+  const updated=await commit(row,r);
+  return roomView(updated,idx,await missingSeats(r,c));
+ }
  if(action==="leave"){
   if(r.phase!=="lobby")throw new ApiError("Δεν μπορείς να φύγεις στη μέση της παρτίδας.",409);
   if(idx===0)throw new ApiError("Ο οικοδεσπότης δεν μπορεί να αποχωρήσει από το δωμάτιο.",409);
   event(r,r.seats[idx]!.name+" άφησε την καρέκλα.");
   r.seats[idx]=null;
-  return roomView(await commit(row,r),-1);
+  const updated=await commit(row,r);
+  await forgetPresence(c,idx);
+  return roomView(updated,-1);
  }
  if(action==="start"){
   requiresHost(idx);
@@ -203,10 +286,14 @@ async function handle(body:AnyObject){
   r.seats=r.seats.map((seat,p)=>seat||{kind:"ai",name:["Εσύ","Αριστερά AI","Συμπαίκτης AI","Δεξιά AI"][p]});
   r.game=E.newRound();r.grand={};r.trades={};r.phase="active";
   event(r,"Ξεκίνησε η παρτίδα. Οι κενές καρέκλες έγιναν υπολογιστές.");
-  return roomView(await commit(row,r),idx);
+  return roomView(await commit(row,r),idx,await missingSeats(r,c));
  }
  if(r.phase!=="active"||!r.game)throw new ApiError("Δεν έχει ξεκινήσει παρτίδα.",409);
  const g=r.game;
+ if(["grand","trade","tichu","play","pass"].includes(action)){
+  const missing=await missingSeats(r,c);
+  if(missing.length)throw new ApiError("⏸ Η παρτίδα είναι σε παύση. Περιμένετε τον φίλο ή επιλέξτε «Συνέχεια με AI».",409);
+ }
  if(action==="next"){
   requiresHost(idx);
   if(g.stage!=="finished")throw new ApiError("Ο γύρος δεν έχει τελειώσει.");
