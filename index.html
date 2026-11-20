@@ -715,6 +715,20 @@
  border-color:#9aefc5;
 }
 
+/* Collapsible tutorial lives only inside settings and uses no table height. */
+.settings-panel{max-height:min(85dvh,530px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.tutorial-details{border:1px solid #68afc680;border-radius:10px;overflow:hidden;background:#0d3450;color:#e5f7fd}
+.tutorial-details summary{display:flex;align-items:center;justify-content:center;min-height:33px;padding:8px;cursor:pointer;list-style:none;font-size:12px;font-weight:800}
+.tutorial-details summary::-webkit-details-marker{display:none}
+.tutorial-details summary:focus-visible{outline:2px solid #9df4e9;outline-offset:-2px}
+.tutorial-details[open] summary{border-bottom:1px solid #72bccc6b;background:#1b5674}
+.tutorial-content{padding:8px 9px;max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:11px;line-height:1.4;text-align:left;color:#d5ebf5;scrollbar-width:thin}
+.tutorial-content p{margin:0 0 8px}
+.tutorial-content p:last-child{margin-bottom:0}
+.tutorial-content strong{color:#a1f5dd}
+@media(orientation:portrait) and (max-width:650px){.settings-panel{max-height:calc(100vw - 48px)}.tutorial-details summary{font-size:11px;padding:6px;min-height:28px}.tutorial-content{max-height:min(39vw,180px);font-size:10px}}
+@media(orientation:portrait) and (max-width:360px){.settings-panel{max-height:calc(100vw - 40px)}.tutorial-content{max-height:120px}}
+
 </style>
 </head>
 <body>
@@ -729,6 +743,7 @@
  <button class="settings-toggle" id="settingsToggle" type="button" aria-label="Ρυθμίσεις Tichu Online" aria-expanded="false" aria-controls="settingsPanel" title="Ρυθμίσεις">⚙</button>
  <div class="settings-panel" id="settingsPanel" hidden>
   <strong>⚙ Ρυθμίσεις & δωμάτιο</strong>
+  <p class="online-info" id="onlineInfo">Φτιάξε δωμάτιο, κάλεσε φίλους και πάτα Εκκίνηση. Οι κενές θέσεις γίνονται AI.</p>
   <label for="playerName">Όνομα παίκτη</label>
   <input id="playerName" type="text" maxlength="22" autocomplete="nickname" placeholder="Το όνομά σου">
   <button class="btn primary" id="createRoom" type="button">＋ Δημιουργία δωματίου</button>
@@ -738,6 +753,19 @@
   <button class="btn" id="shareRoom" type="button" hidden>🔗 Αντιγραφή πρόσκλησης</button>
   <button class="btn warn" id="new" type="button" hidden>↻ Νέα παρτίδα</button>
   <button class="btn" id="leaveRoom" type="button" hidden>Αποχώρηση από καρέκλα</button>
+  <details class="tutorial-details" id="tichuTutorial">
+<summary>📖 Πώς παίζεται το Tichu</summary>
+<div class="tutorial-content">
+<p><strong>Στόχος:</strong> Παίζετε 2 εναντίον 2, με συμπαίκτη τον απέναντι. Η πρώτη ομάδα που φτάνει τους 1.000 βαθμούς στο τέλος γύρου κερδίζει.</p>
+<p><strong>Μοίρασμα:</strong> Βλέπεις 8 φύλλα, αποφασίζεις για Grand Tichu, παίρνεις άλλα 6 και ανταλλάσσεις από ένα φύλλο με κάθε άλλον παίκτη.</p>
+<p><strong>Συνδυασμοί:</strong> Μονό, ζευγάρι, τριάδα, φουλ (3+2), κέντα τουλάχιστον 5 συνεχόμενων ή συνεχόμενα ζευγάρια. Απαντάς με ισχυρότερο ίδιο συνδυασμό ή πάσο. Βόμβα: 4 ίδια ή κέντα ίδιου χρώματος.</p>
+<p><strong>Mahjong:</strong> Το 1, ξεκινά τον γύρο και σου επιτρέπει να ζητήσεις αριθμό 2–Άσο. Αν κάποιος μπορεί νόμιμα να εκπληρώσει την ευχή, οφείλει να το κάνει.</p>
+<p><strong>Dog 🐕:</strong> Παραχωρεί το ξεκίνημα στον συμπαίκτη. <strong>Phoenix 🔥:</strong> Μπαλαντέρ, −25 βαθμοί. <strong>Dragon 🐉:</strong> Ισχυρότερο μονό, +25 βαθμοί· κερδισμένη μπάζα Dragon δίνεται σε αντίπαλο.</p>
+<p><strong>Tichu:</strong> Δήλωση ότι θα τελειώσεις πρώτος, +100 αν πετύχει ή −100 αν όχι. <strong>Grand Tichu:</strong> Η ίδια πρόβλεψη στα πρώτα 8 φύλλα, ±200.</p>
+<p><strong>Βαθμοί:</strong> 5 = 5, 10 και Ρήγας = 10, Dragon = 25, Phoenix = −25. Αν οι δύο συμπαίκτες βγουν πρώτοι και δεύτεροι, παίρνουν 200 αντί των βαθμών των φύλλων.</p>
+<p><strong>Χειρισμός:</strong> Επίλεξε φύλλα και πάτα «Παίξε». Υπάρχουν «Πάσο», «Υπόδειξη», και glow για νόμιμες κέντες όταν πατάς το μικρότερο φύλλο.</p>
+<p><strong>Online:</strong> Κάλεσε φίλους με κωδικό, διάλεξαν καρέκλα και πάτα «Εκκίνηση». Οι υπόλοιπες καρέκλες γίνονται AI. Αν φίλος αποσυνδεθεί, το παιχνίδι παγώνει έως ότου επιστρέψει ή επιλεγεί «Συνέχεια με AI».</p>
+</div></details>
 </div>
 </header>
 <section class="panel">
@@ -756,7 +784,6 @@
   <div class="hand" id="hand" aria-label="Τα φύλλα σου"></div>
   <button class="yourseat seat-bottom" id="you" type="button">Εσύ · Χωρίς δωμάτιο</button>
  </div>
- <p class="online-info" id="onlineInfo">Φτιάξε δωμάτιο, στείλε τον κωδικό σε φίλους και πάτα Εκκίνηση. Κάθε κενή θέση θα παίζει με υπολογιστή.</p>
 </section>
 </main>
 <script src="./engine.js?v=20261120-bomb-rule"></script>
