@@ -950,7 +950,7 @@ async function sit(globalSeat){
 }
 async function leave(){
  if(!room||room.selfSeat<=0||room.phase!=='lobby')return;
- const yes=confirm('Να αφήσεις την καρέκλα σου;');
+ const yes=await GameDialog.confirm('Να αφήσεις την καρέκλα σου;');
  if(!yes)return;
  const data=await perform('leave',{});
  if(data){seatToken='';saveLocal();status('Άφησες την καρέκλα.');}
@@ -959,7 +959,7 @@ async function share(){
  if(!roomCode){status('Φτιάξε πρώτα δωμάτιο.');return;}
  const url='https://seemsfunny21.github.io/applications/?app=tichufunnyonline&room='+roomCode;
  try{await navigator.clipboard.writeText(url);status('Αντιγράφηκε ο σύνδεσμος δωματίου '+roomCode+'.');}
- catch(_){prompt('Αντέγραψε τον σύνδεσμο:',url);}
+ catch(_){await GameDialog.copy(url);}
 }
 function makeCard(card,disabled,click,assigned,chosen,glow){
  const button=document.createElement('button');button.type='button';
@@ -1033,10 +1033,9 @@ async function play(){
  const ids=[...selected],hasMahjong=room.game.hand.some(c=>selected.has(c.id)&&c.key==='M');
  let wish=null;
  if(hasMahjong){
-  const response=prompt('Ευχή Mahjong: αριθμός 2 έως 14 (11=J,12=Q,13=K,14=A):','9');
-  if(response===null)return;
-  wish=Number(response);
-  if(!Number.isInteger(wish)||wish<2||wish>14){status('Επίλεξε αριθμό 2–14.');return;}
+  const initialCode=roomCode,initialToken=seatToken;
+  wish=await GameDialog.wish();
+  if(wish===null||roomCode!==initialCode||seatToken!==initialToken)return;
  }
  await perform('play',{ids:ids,wish:wish});
 }
@@ -1239,7 +1238,7 @@ $('openRoom').addEventListener('click',openRoom);
 $('shareRoom').addEventListener('click',share);
 $('leaveRoom').addEventListener('click',leave);
 $('new').addEventListener('click',async()=>{
- if(!confirm('Νέα παρτίδα από την αρχή; Τα σκορ του δωματίου θα μηδενιστούν.'))return;
+ if(!await GameDialog.confirm('Νέα παρτίδα από την αρχή; Τα σκορ του δωματίου θα μηδενιστούν.'))return;
  const data=await perform('restart',{});
  if(data)showSettings(false);
 });
