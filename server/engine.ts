@@ -21,8 +21,12 @@ function plainVariants(cards){
   if(n===4&&freq.length===1&&!phoenix)out.push(makeCandidate('bomb4',n,nums[0],1));
   if(n===5&&freq.includes(3)&&freq.includes(2))out.push(makeCandidate('full',n,nums[freq.indexOf(3)]));
   if(n>=5&&nums.length===n&&nums[n-1]-nums[0]===n-1){
-   out.push(makeCandidate('straight',n,nums[n-1]));
-   if(!phoenix&&cards.every(c=>!c.key&&c.suit===cards[0].suit))out.push(makeCandidate('bombStraight',n,nums[n-1],2));
+   // A straight flush is a bomb, never an ordinary straight.
+   // Official Tichu rules do not allow playing it as a normal sequence.
+   const straightFlush=!phoenix&&cards.every(c=>!c.key&&c.suit===cards[0].suit);
+   out.push(straightFlush
+     ?makeCandidate('bombStraight',n,nums[n-1],2)
+     :makeCandidate('straight',n,nums[n-1]));
   }
   if(n>=4&&n%2===0&&nums.length===n/2&&freq.every(x=>x===2)&&nums[nums.length-1]-nums[0]===nums.length-1)
    out.push(makeCandidate('pairs',n,nums[nums.length-1]));
