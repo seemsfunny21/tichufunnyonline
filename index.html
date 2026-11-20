@@ -695,6 +695,26 @@
  .table#cardTable > .hand{height:76px}
 }
 
+
+/* Paused multiplayer is visibly frozen, with the player seat retained.
+   Only an explicit "Συνέχεια με AI" can replace an absent human. */
+.table#cardTable.paused{
+ border-color:#f9c56ca8;
+ box-shadow:inset 0 0 0 4px #123e57,inset 0 0 18px #051a2e,
+ 0 0 14px #ffb65f4a;
+}
+.table#cardTable .seat.offline{
+ border-color:#f3ac58!important;
+ background:linear-gradient(135deg,#61412c,#253d53)!important;
+ box-shadow:0 0 12px #ed9c528c!important;
+}
+.table#cardTable .seat.offline .count{color:#ffe1ba}
+.table#cardTable.paused .table-status{color:#ffe0b7;font-weight:800}
+.table#cardTable.paused .table-actionbar .btn.primary{
+ background:linear-gradient(120deg,#19795a,#115b64);
+ border-color:#9aefc5;
+}
+
 </style>
 </head>
 <body>
@@ -747,6 +767,7 @@ const E=window.TichuEngine, $=id=>document.getElementById(id);
 const API='https://zrbmsziipzabnniqcpav.supabase.co/functions/v1/tichu-online';
 const KEY='tichufunnyonline:session:v1', NAME='tichufunnyonline:preview:name';
 let room=null,roomCode='',seatToken='',busy=false,polling=false,active=true;
+let parentActive=true,pollTimer=null,failures=0;
 let selected=new Set(),preview=null,trades={},notice='';
 const seats=['you','seat1','seat2','seat3'];
 const cardsById=new Map(E.deck().map(c=>[c.id,c]));
@@ -781,7 +802,7 @@ async function perform(action,extra,clear){
  busy=true;render();
  try{const data=await call(action,extra);accept(data,clear!==false);status('');return data;}
  catch(err){status(err.message||'Πρόβλημα σύνδεσης.');render();return null;}
- finally{busy=false;render();}
+ finally{busy=false;render();schedulePoll();}
 }
 async function createRoom(){
  if(busy)return;
@@ -924,13 +945,15 @@ function render(){
   el.classList.toggle('occupied',!!s);
   el.classList.toggle('waiting',!s);
   el.classList.toggle('ai-seat',s?.kind==='ai');
+  const offline=!!room?.paused&&room.missingSeats?.includes(p);
+  el.classList.toggle('offline',offline);
   el.classList.toggle('trade-target',!!(g?.stage==='trade'&&self>=0&&p!==self&&!room.waiting?.trade&&selected.size===1));
   const n=s?(my?'Εσύ':s.name):('Θέση '+(p+1));
   if(id==='you'){
    el.textContent=n+(g?' · '+g.counts[p]+' φύλλα':' · '+(free?'Κάτσε':'αναμονή'));
   }else{
    el.querySelector('strong').textContent=(id==='seat2'?'🤝 ':'')+n;
-   el.querySelector('.count').textContent=free?'✋ Κάτσε':(s?(g?g.counts[p]+' φύλλα':'Έτοιμος'):'Κενή καρέκλα');
+   el.querySelector('.count').textContent=free?'✋ Κάτσε':(offline?'⏸ Εκτός σύνδεσης':(s?(g?g.counts[p]+' φύλλα':'Έτοιμος'):'Κενή καρέκλα'));
   }
   el.disabled=!free&&!(g?.stage==='trade'&&self>=0&&p!==self&&!room.waiting?.trade&&selected.size===1);
   el.onclick=free?()=>sit(p):(g?.stage==='trade'&&self>=0&&p!==self?()=>assignTrade(p):null);
@@ -949,7 +972,10 @@ function render(){
   label.textContent=!room?'Φτιάξε δωμάτιο ή μπες με κωδικό':room.phase==='lobby'?'Κάτσε σε ελεύθερη καρέκλα':g?.stage==='grand'?'Grand Tichu':g?.stage==='trade'?'Ανταλλαγές':g?.stage==='finished'?'Τέλος γύρου':'Νέα μπάζα';
   pot.textContent=!room?'Εσύ και οι φίλοι σου · οι κενές θέσεις γίνονται AI':room.phase==='lobby'?'Όταν πατηθεί Εκκίνηση, οι κενές θέσεις γίνονται AI.':g?.stage==='grand'?'Βλέπεις τα πρώτα 8 φύλλα σου.':g?.stage==='trade'?'Δώσε ένα φύλλο σε κάθε άλλον παίκτη.':g?.stage==='finished'?'Ο γύρος τελείωσε.':'Περιμένουμε το πρώτο φύλλο.';
  }
- $('tableStatus').textContent=notice||(!room?'Μπες ή δημιούργησε δωμάτιο.':room.phase==='lobby'?'Αναμονή παικτών.':g?.stage==='playing'?(g.turn===self?'Η σειρά σου.':'Περιμένουμε παίκτη…'):'');
+ $('tableStatus').textContent=room?.paused?
+  '⏸ Παύση — περιμένουμε επανασύνδεση ή συνέχεια με AI.':
+  notice||(!room?'Μπες ή δημιούργησε δωμάτιο.':room.phase==='lobby'?'Αναμονή παικτών.':g?.stage==='playing'?(g.turn===self?'Η σειρά σου.':'Περιμένουμε παίκτη…'):'');
+ $('cardTable').classList.toggle('paused',!!room?.paused);
  const hand=$('hand');hand.replaceChildren();
  for(const c of sorted(g?.hand||[])){
   const assigned=Object.values(trades).includes(c.id);
@@ -964,6 +990,13 @@ function render(){
   if(host)actionButton('▶ Εκκίνηση · κενές θέσεις με AI',()=>perform('start',{}),true,busy);
   else actionButton(self<0?'✋ Κάτσε σε ελεύθερη καρέκλα':'Αναμονή εκκίνησης',()=>{},false,true);
   actionButton('🔗 Πρόσκληση',share,false,false);
+  }else if(room.paused){
+  const offlineSeats=room.missingSeats||[];
+  actionButton('⏸ Παύση παρτίδας',()=>{},false,true);
+  if(self>=0)for(const p of offlineSeats){
+   const former=seatsInRoom[p]?.name||('Θέση '+(p+1));
+   actionButton('▶ Συνέχεια με AI · '+former,()=>perform('continue_ai',{seat:p}),true,busy);
+  }
  }else if(g?.stage==='grand'){
   if(self>=0&&!room.waiting?.grand){
    actionButton('Grand Tichu +200',()=>perform('grand',{yes:true}),false,busy);
@@ -999,16 +1032,61 @@ function render(){
  $('leaveRoom').hidden=!(room?.phase==='lobby'&&self>0);
  $('onlineInfo').textContent=!room?'Δημιούργησε δωμάτιο, κάλεσε φίλους και πάτα Εκκίνηση. Οι κενές καρέκλες γίνονται υπολογιστές.':
   room.phase==='lobby'?'Κωδικός '+room.code+' · Ο οικοδεσπότης ξεκινά με όσους φίλους κάθονται. Οι υπόλοιποι είναι AI.':
+  room.paused?'⏸ Το παιχνίδι έχει αποθηκευτεί. Ο φίλος μπορεί να επιστρέψει ή να επιλέξετε AI.':
   'Μικτό παιχνίδι με φίλους και AI · Τα φύλλα κάθε παίκτη είναι ιδιωτικά.';
 }
+/* Only a room with multiple human participants needs frequent updates.
+   Lobby = 12s, live multiplayer = 5-7s, paused = 14s, hidden = zero.
+   Human-vs-AI alone works from immediate action responses without polling. */
+function pollDelay(){
+ if(!active||!roomCode)return 0;
+ if(!room)return 8_000;
+ if(room.phase==='lobby')return 12_000;
+ const humans=room.seats.filter(seat=>seat?.kind==='human').length;
+ if(humans<=1)return 0;
+ if(room.paused)return 14_000;
+ if(room.game?.stage==='finished')return 16_000;
+ return ['grand','trade'].includes(room.game?.stage)?7_000:5_000;
+}
+function schedulePoll(override){
+ if(pollTimer!==null){clearTimeout(pollTimer);pollTimer=null;}
+ let delay=override===undefined?pollDelay():override;
+ if(!active||!roomCode||!delay)return;
+ if(failures)delay=Math.min(60_000,delay*Math.pow(2,Math.min(failures,4)));
+ pollTimer=setTimeout(()=>{pollTimer=null;void poll();},delay);
+}
 async function poll(){
- if(!active||busy||polling||!roomCode)return;
+ if(!active||busy||polling||!roomCode){if(!polling)schedulePoll();return;}
+ const requestCode=roomCode,requestToken=seatToken;
  polling=true;
  try{
   const next=await call('state',{});
-  if(!room||next.version!==room.version||next.selfSeat!==room.selfSeat)accept(next,false);
- }catch(err){status('Σύνδεση: '+(err.message||'πρόβλημα'));}
- finally{polling=false;}
+  if(!active||busy||requestCode!==roomCode||requestToken!==seatToken)return;
+  if(room&&next.version<room.version)return;
+  failures=0;
+  if(!room||next.version!==room.version||next.selfSeat!==room.selfSeat||
+    next.paused!==room.paused||
+    JSON.stringify(next.missingSeats||[])!==JSON.stringify(room.missingSeats||[]))accept(next,false);
+  else if(notice.startsWith('Σύνδεση:')){notice='';render();}
+ }catch(err){
+  failures=Math.min(failures+1,4);
+  if(active)status('Σύνδεση: '+(err.message||'πρόβλημα'));
+ }finally{polling=false;schedulePoll();}
+}
+function markDisconnected(){
+ if(!roomCode||!seatToken||room?.selfSeat<0||!room)return;
+ // Best-effort hint. If unload blocks it, the server's 25s heartbeat
+ // timeout still pauses the room; the saved game is never deleted.
+ try{fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({action:'disconnect',code:roomCode,token:seatToken}),
+  keepalive:true,cache:'no-store'}).catch(()=>{});}catch(_){}
+}
+function setPresence(visible){
+ const next=!!visible&&document.visibilityState==='visible'&&parentActive;
+ if(next===active)return;
+ active=next;
+ if(active){failures=0;void poll();}
+ else{schedulePoll();markDisconnected();}
 }
 $('settingsToggle').addEventListener('click',()=>showSettings($('settingsPanel').hidden));
 document.addEventListener('click',e=>{if(!$('settingsPanel').hidden&&!e.target.closest('.hero'))showSettings(false);});
@@ -1031,13 +1109,18 @@ try{saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};$('playerName').valu
 const invited=new URLSearchParams(location.search).get('room')?.toUpperCase();
 roomCode=/^[A-HJ-NP-Z2-9]{6}$/.test(invited||'')?invited:(saved.code||'');
 seatToken=roomCode===saved.code?(saved.token||''):'';
-if(roomCode){$('joinCode').value=roomCode;poll();}
+if(roomCode){$('joinCode').value=roomCode;void poll();}
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin)return;
- if(e.data?.type==='tichufunnyonline:visibility'){active=!!e.data.active;if(active)poll();}
+ if(e.data?.type==='tichufunnyonline:visibility'){
+  parentActive=!!e.data.active;
+  setPresence(parentActive);
+ }
 });
-document.addEventListener('visibilitychange',()=>{active=document.visibilityState==='visible';if(active)poll();});
-setInterval(poll,2200);
+document.addEventListener('visibilitychange',()=>setPresence(parentActive));
+window.addEventListener('pagehide',()=>{if(active)markDisconnected();active=false;schedulePoll();});
+window.addEventListener('pageshow',()=>setPresence(parentActive));
+active=document.visibilityState==='visible';
 render();
 })();
 
