@@ -744,6 +744,72 @@
 }
 
 </style>
+<style id="game-dialog-theme">
+.game-dialog-cover{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px;background:#021426d9;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.game-dialog-cover[hidden]{display:none!important}
+.game-dialog-box{box-sizing:border-box;width:min(370px,100%);max-height:min(82dvh,440px);overflow:auto;padding:15px 14px;border:1px solid #7ccef3;border-radius:16px;background:linear-gradient(145deg,#194f77,#0a2945 83%);box-shadow:0 16px 40px #000b,0 0 20px #36aff83b;color:#e8f8ff;font:inherit;text-align:center}
+.game-dialog-box h2{font-size:clamp(15px,2.5vw,19px);margin:0 0 7px;line-height:1.2;color:#f0fbff}
+.game-dialog-box p{font-size:clamp(12px,1.8vw,14px);line-height:1.45;color:#c7e1f6;margin:0 0 12px}
+.game-dialog-actions{display:flex;gap:8px;justify-content:center;align-items:stretch}
+.game-dialog-btn{flex:1 1 0;min-width:0;min-height:37px;border-radius:10px;border:1px solid #659ec9;background:linear-gradient(145deg,#22577f,#123856);color:#f3fbff;padding:7px 8px;font:700 12px system-ui,sans-serif;cursor:pointer}
+.game-dialog-btn.primary{border-color:#8de0ff;background:linear-gradient(145deg,#259bdc,#1460a2);box-shadow:0 0 12px #2cb9f653}
+.game-dialog-btn:focus-visible{outline:2px solid #90f3fc;outline-offset:2px}
+.game-dialog-choices{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin:10px 0 13px}
+.game-dialog-choices button{min-width:0;min-height:36px;border:1px solid #63a6cc;border-radius:8px;background:linear-gradient(145deg,#246b97,#114466);color:white;font:800 13px system-ui,sans-serif;padding:4px 0;cursor:pointer}
+.game-dialog-choices button:focus-visible{outline:2px solid #abfddc;outline-offset:1px}
+.game-dialog-copy{display:block;width:100%;margin:8px 0 12px;padding:8px;border:1px solid #6ab5d9;border-radius:8px;background:#0b2c45;color:#d8f4ff;font:12px system-ui,sans-serif}
+@media(max-width:380px){.game-dialog-cover{padding:7px}.game-dialog-box{padding:10px}.game-dialog-choices{gap:4px}.game-dialog-choices button{min-height:31px;font-size:12px}}
+</style>
+<script id="game-dialog-controller">
+(function(){
+ 'use strict';
+ let current=null;
+ function mount(){
+  let el=document.getElementById('gameDialogCover');
+  if(el)return el;
+  el=document.createElement('div');el.id='gameDialogCover';el.className='game-dialog-cover';el.hidden=true;
+  el.setAttribute('role','presentation');
+  const root=document.querySelector('main.app')||document.querySelector('.app-shell')&&document.body||document.body;
+  root.appendChild(el);
+  return el;
+ }
+ function open(title,message,choices,opts){
+  if(current)return Promise.resolve(null);
+  const layer=mount();layer.replaceChildren();layer.hidden=false;
+  const box=document.createElement('section');box.className='game-dialog-box';
+  box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label',title);
+  const heading=document.createElement('h2');heading.textContent=title;box.appendChild(heading);
+  const paragraph=document.createElement('p');paragraph.textContent=message;box.appendChild(paragraph);
+  const zone=document.createElement('div');zone.className=opts&&opts.grid?'game-dialog-choices':'game-dialog-actions';
+  box.appendChild(zone);layer.appendChild(box);
+  let resolvePromise;
+  const promise=new Promise(resolve=>{resolvePromise=resolve;});
+  const close=value=>{
+   if(!current)return;
+   document.removeEventListener('keydown',keyHandler,true);layer.hidden=true;layer.replaceChildren();
+   current=null;resolvePromise(value);
+  };
+  const keyHandler=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(null);}};
+  current={close};document.addEventListener('keydown',keyHandler,true);
+  if(opts&&opts.input){
+   const input=document.createElement('input');input.className='game-dialog-copy';input.readOnly=true;input.value=opts.input;input.setAttribute('aria-label','Σύνδεσμος πρόσκλησης');box.insertBefore(input,zone);
+   input.addEventListener('focus',()=>input.select());
+  }
+  for(const option of choices){
+   const button=document.createElement('button');button.type='button';
+   button.className=opts&&opts.grid?'':'game-dialog-btn'+(option.primary?' primary':'');
+   button.textContent=option.label;button.addEventListener('click',()=>close(option.value));
+   zone.appendChild(button);
+  }
+  const first=zone.querySelector('button');if(first)first.focus();
+  return promise;
+ }
+ const confirm=message=>open('Επιβεβαίωση',message,[{label:'Ακύρωση',value:false},{label:'Συνέχεια',value:true,primary:true}]).then(x=>x===true);
+ const wish=()=>open('🀄 Ευχή Mahjong','Ποιο φύλλο ζητάς από τους επόμενους παίκτες;',[...Array(13)].map((_,i)=>{const n=i+2;return{label:n===11?'J':n===12?'Q':n===13?'K':n===14?'A':String(n),value:n};}).concat([{label:'Ακύρωση',value:null}]),{grid:true});
+ const copy=url=>open('🔗 Πρόσκληση φίλου','Αντέγραψε τον σύνδεσμο και στείλε τον φίλο σου.',[{label:'Κλείσιμο',value:true,primary:true}],{input:url});
+ window.GameDialog=Object.freeze({confirm,wish,copy});
+})();
+</script>
 </head>
 <body>
 <main class="app">
