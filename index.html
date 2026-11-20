@@ -626,6 +626,75 @@
  .online-tag{font-size:8px;margin-left:1px}
 }
 
+
+/* Real mixed multiplayer: in-table action dock and clickable chairs. */
+.table#cardTable{
+ grid-template-areas:". north ." "west center east" "actions actions actions" "hand hand hand" ". south .";
+ grid-template-rows:38px minmax(81px,1fr) 34px 89px 34px;
+ min-height:305px;
+}
+.table#cardTable .seat{appearance:none;cursor:pointer;font:inherit}
+.table#cardTable .seat:disabled{cursor:default}
+.table#cardTable .seat.can-sit{
+ border-color:#77e2b6;box-shadow:0 0 13px #54e9a48c;
+ background:linear-gradient(120deg,#105944,#0b3f52);
+}
+.table#cardTable .seat.can-sit .count{color:#a7ffd8;font-weight:800}
+.table#cardTable .seat.occupied{border-color:#76b5d084}
+.table#cardTable .seat.ai-seat{border-style:dashed}
+.table#cardTable .seat.myseat{border-color:#86ffc6;box-shadow:0 0 13px #54ebac66}
+.table#cardTable .seat.trade-target{border-color:#86ffe0;cursor:pointer}
+.table#cardTable > #controls{
+ grid-area:actions;display:flex!important;align-items:center;justify-content:center;
+ flex-wrap:nowrap;min-height:31px;margin:0;padding:1px 4px;gap:5px;
+ overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x;
+ background:#082b3fa3;border:1px solid #6db5c55f;border-radius:10px;
+}
+.table#cardTable > #controls .btn{
+ width:auto!important;flex:0 0 auto;
+ min-height:28px;padding:4px 9px;font-size:11px;
+ white-space:nowrap;line-height:1.1;border-radius:8px;
+}
+.room-marker{font-size:10px;color:#9becd6;font-weight:850;line-height:1.1}
+.table-status{font-size:10px;line-height:1.25;color:#bedde9;min-height:12px;
+ text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table#cardTable .pot{max-height:79px}
+.table#cardTable > .hand{height:86px;min-height:0}
+.table#cardTable > .hand .card:not(:disabled){cursor:pointer}
+.table#cardTable .seat-bottom:disabled{opacity:1}
+.online-info{font-size:10px;margin:3px 2px 0}
+#settingsPanel .btn[hidden]{display:none!important}
+#joinCode{text-transform:uppercase;letter-spacing:.12em}
+@media(max-width:600px){
+ .table#cardTable{grid-template-rows:34px minmax(58px,1fr) 32px 78px 30px;min-height:264px}
+ .table#cardTable > .hand{height:76px}
+ .table#cardTable > #controls .btn{font-size:10px;min-height:26px;padding:3px 7px}
+}
+@media(orientation:portrait) and (max-width:650px){
+ .table#cardTable{
+  min-height:232px;height:auto;flex:1 0 auto;
+  grid-template-rows:29px minmax(45px,1fr) 31px 75px 26px;
+ }
+ .table#cardTable > #controls{height:29px;min-height:29px;padding:1px 3px}
+ .table#cardTable > #controls .btn{font-size:10px;min-height:25px;padding:3px 9px}
+ .table#cardTable > .hand{height:73px}
+ .table#cardTable .pot{max-height:40px}
+ .room-marker{font-size:9px}
+ .table-status{font-size:9px;min-height:10px}
+ .online-info{font-size:9px;margin:2px 0 0}
+}
+@media(orientation:portrait) and (max-width:360px){
+ .table#cardTable{min-height:210px;grid-template-rows:24px minmax(39px,1fr) 27px 67px 23px}
+ .table#cardTable > #controls{height:26px;min-height:26px}
+ .table#cardTable > #controls .btn{font-size:9px;min-height:23px;padding:2px 7px}
+ .table#cardTable > .hand{height:65px}
+}
+@media(min-width:601px) and (max-height:560px){
+ .table#cardTable{height:230px;grid-template-rows:28px minmax(43px,1fr) 31px 78px 26px}
+ .table#cardTable > #controls .btn{font-size:10px;min-height:26px}
+ .table#cardTable > .hand{height:76px}
+}
+
 </style>
 </head>
 <body>
@@ -639,75 +708,339 @@
  </div>
  <button class="settings-toggle" id="settingsToggle" type="button" aria-label="Ρυθμίσεις Tichu Online" aria-expanded="false" aria-controls="settingsPanel" title="Ρυθμίσεις">⚙</button>
  <div class="settings-panel" id="settingsPanel" hidden>
-  <strong>⚙ Ρυθμίσεις Online</strong>
-  <label for="playerName">Το όνομά σου (μόνο σε αυτή τη συσκευή)</label>
-  <input id="playerName" type="text" maxlength="22" autocomplete="nickname" placeholder="Εσύ">
-  <button class="btn warn" id="new" type="button" disabled title="Θα ενεργοποιηθεί όταν υλοποιηθούν τα online δωμάτια">↻ Νέα παρτίδα</button>
- </div>
+  <strong>⚙ Ρυθμίσεις & δωμάτιο</strong>
+  <label for="playerName">Όνομα παίκτη</label>
+  <input id="playerName" type="text" maxlength="22" autocomplete="nickname" placeholder="Το όνομά σου">
+  <button class="btn primary" id="createRoom" type="button">＋ Δημιουργία δωματίου</button>
+  <label for="joinCode">Κωδικός φίλου</label>
+  <input id="joinCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABC123" inputmode="text">
+  <button class="btn" id="openRoom" type="button">↪ Άνοιγμα δωματίου</button>
+  <button class="btn" id="shareRoom" type="button" hidden>🔗 Αντιγραφή πρόσκλησης</button>
+  <button class="btn warn" id="new" type="button" hidden>↻ Νέα παρτίδα</button>
+  <button class="btn" id="leaveRoom" type="button" hidden>Αποχώρηση από καρέκλα</button>
+</div>
 </header>
 <section class="panel">
- <div class="table" id="cardTable" aria-label="Προεπισκόπηση τραπεζιού Tichu Online χωρίς συνδεδεμένους παίκτες">
-  <div class="seat partner seat-top waiting" id="seat2"><strong>🤝 Συμπαίκτης</strong><span class="count">Αναμονή</span><span class="card-backs" aria-hidden="true"><i></i><i></i><i></i></span></div>
-  <div class="seat seat-left waiting" id="seat1"><strong>Αριστερά</strong><span class="count">Αναμονή</span><span class="card-backs" aria-hidden="true"><i></i><i></i></span></div>
+ <div class="table" id="cardTable" aria-label="Online τραπέζι Tichu με τέσσερις καρέκλες">
+  <button class="seat partner seat-top" id="seat2" type="button"><strong>🤝 Συμπαίκτης</strong><span class="count">Κενή καρέκλα</span><span class="card-backs" aria-hidden="true"><i></i><i></i><i></i></span></button>
+  <button class="seat seat-left" id="seat1" type="button"><strong>Αριστερά</strong><span class="count">Κενή καρέκλα</span><span class="card-backs" aria-hidden="true"><i></i><i></i></span></button>
   <div class="table-center">
-   <div class="trick-label">Δείγμα κέντας · 3–9</div>
-   <div class="online-preview-badge">ΠΡΟΕΠΙΣΚΟΠΗΣΗ</div>
-   <div class="pot" id="pot" aria-label="Ενδεικτική κέντα 3 έως 9"></div>
+   <div id="roomMarker" class="room-marker">Tichu Online</div>
+   <div id="trickLabel" class="trick-label">Φτιάξε δωμάτιο ή μπες με κωδικό</div>
+   <div id="trickOwner" class="trick-owner hidden" role="status" aria-live="polite"></div>
+   <div class="pot empty" id="pot">Εσύ και οι φίλοι σου · οι κενές θέσεις γίνονται AI</div>
+   <div id="tableStatus" class="table-status" role="status" aria-live="polite"></div>
   </div>
-  <div class="seat seat-right waiting" id="seat3"><strong>Δεξιά</strong><span class="count">Αναμονή</span><span class="card-backs" aria-hidden="true"><i></i><i></i></span></div>
-  <div class="hand" id="hand" aria-label="Ενδεικτική τράπουλα, όχι πραγματικά φύλλα παρτίδας"></div>
-  <div class="yourseat seat-bottom" id="you">Εσύ · 14 φύλλα (δείγμα)</div>
+  <button class="seat seat-right" id="seat3" type="button"><strong>Δεξιά</strong><span class="count">Κενή καρέκλα</span><span class="card-backs" aria-hidden="true"><i></i><i></i></span></button>
+  <div id="controls" class="controls table-actionbar" aria-label="Ενέργειες παιχνιδιού"></div>
+  <div class="hand" id="hand" aria-label="Τα φύλλα σου"></div>
+  <button class="yourseat seat-bottom" id="you" type="button">Εσύ · Χωρίς δωμάτιο</button>
  </div>
- <div class="preview-note" id="previewNote" role="status" aria-live="polite">Πάτησε το 3 για να δεις το glow της κέντας.</div>
- <p class="online-info"><strong>Η εμφάνιση είναι έτοιμη.</strong> Τα online δωμάτια και ο συγχρονισμός τεσσάρων παικτών δεν έχουν ενεργοποιηθεί ακόμη.</p>
+ <p class="online-info" id="onlineInfo">Φτιάξε δωμάτιο, στείλε τον κωδικό σε φίλους και πάτα Εκκίνηση. Κάθε κενή θέση θα παίζει με υπολογιστή.</p>
 </section>
 </main>
+<script src="./engine.js"></script>
 <script>
 (function(){
- 'use strict';
- const $=id=>document.getElementById(id);
- const hand=[['3','♠'],['4','♦'],['5','♥'],['6','♣'],['7','♠'],['8','♦'],['9','♥'],['10','♣'],['J','♠'],['Q','♦'],['K','♥'],['A','♣'],['🐕',''],['🐉','']];
- const set=new Set(['4','5','6','7','8','9']);
- const faces=new Set(['♥','♦']);
- function card(rank,suit,interactive){
-  const b=document.createElement('button');
-  b.type='button';b.className='card'+(faces.has(suit)?' red':'')+(suit?'':' special')+(interactive?' preview-start':'');
-  b.setAttribute('aria-label',rank+suit+(interactive?' · προεπισκόπηση κέντας':' · ενδεικτικό φύλλο'));
-  b.disabled=!interactive;
-  const top=document.createElement('b');top.textContent=rank;
-  const center=document.createElement('span');center.className='center';center.textContent=suit||rank;
-  const foot=document.createElement('small');foot.textContent=suit||'Tichu';
-  b.append(top,center,foot);return b;
+'use strict';
+const E=window.TichuEngine, $=id=>document.getElementById(id);
+const API='https://zrbmsziipzabnniqcpav.supabase.co/functions/v1/tichu-online';
+const KEY='tichufunnyonline:session:v1', NAME='tichufunnyonline:preview:name';
+let room=null,roomCode='',seatToken='',busy=false,polling=false,active=true;
+let selected=new Set(),preview=null,trades={},notice='';
+const seats=['you','seat1','seat2','seat3'];
+const cardsById=new Map(E.deck().map(c=>[c.id,c]));
+const SUITS=['♠','♥','♣','♦'],red=new Set([1,3]);
+const names=['Εσύ','Αριστερά','Συμπαίκτης','Δεξιά'];
+function text(s){return String(s||'');}
+function playerName(){return $('playerName').value.trim().slice(0,22)||'Παίκτης';}
+function saveLocal(){
+ try{localStorage.setItem(KEY,JSON.stringify({code:roomCode,token:seatToken}));}catch(_){}
+}
+function showSettings(open){
+ $('settingsPanel').hidden=!open;
+ $('settingsToggle').setAttribute('aria-expanded',open?'true':'false');
+}
+function status(s){notice=s;$('tableStatus').textContent=s;}
+async function call(action,extra){
+ const resp=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+  cache:'no-store',body:JSON.stringify(Object.assign({action:action,code:roomCode,token:seatToken},extra||{}))});
+ let result;
+ try{result=await resp.json();}catch(_){throw Error('Δεν απάντησε σωστά ο διακομιστής.');}
+ if(!resp.ok||result.error)throw Error(result.error||'Αποτυχία επικοινωνίας.');
+ return result;
+}
+function accept(data,clear){
+ if(data.token)seatToken=data.token;
+ if(data.code)roomCode=data.code;
+ if(clear){selected.clear();preview=null;trades={};}
+ room=data;saveLocal();render();
+}
+async function perform(action,extra,clear){
+ if(busy)return;
+ busy=true;render();
+ try{const data=await call(action,extra);accept(data,clear!==false);status('');return data;}
+ catch(err){status(err.message||'Πρόβλημα σύνδεσης.');render();return null;}
+ finally{busy=false;render();}
+}
+async function createRoom(){
+ if(busy)return;
+ const result=await perform('create',{name:playerName()});
+ if(result){$('joinCode').value=result.code;showSettings(false);status('Δώσε τον κωδικό '+result.code+' σε φίλους.');}
+}
+async function openRoom(){
+ const c=$('joinCode').value.trim().toUpperCase();
+ if(!/^[A-HJ-NP-Z2-9]{6}$/.test(c)){status('Χρειάζεται κωδικός 6 χαρακτήρων.');return;}
+ const prevCode=roomCode,prevToken=seatToken;
+ roomCode=c;seatToken=prevCode===c?prevToken:'';
+ const data=await perform('state',{},true);
+ if(data){showSettings(false);status('Πάτησε «Κάτσε» σε μια ελεύθερη καρέκλα.');}
+ else{roomCode=prevCode;seatToken=prevToken;render();}
+}
+async function sit(globalSeat){
+ if(busy||!room||room.phase!=='lobby'||room.selfSeat>=0||room.seats[globalSeat])return;
+ const data=await perform('join',{seat:globalSeat,name:playerName()});
+ if(data)status('Κάθισες! Περιμένουμε να πατήσει Εκκίνηση ο οικοδεσπότης.');
+}
+async function leave(){
+ if(!room||room.selfSeat<=0||room.phase!=='lobby')return;
+ const yes=confirm('Να αφήσεις την καρέκλα σου;');
+ if(!yes)return;
+ const data=await perform('leave',{});
+ if(data){seatToken='';saveLocal();status('Άφησες την καρέκλα.');}
+}
+async function share(){
+ if(!roomCode){status('Φτιάξε πρώτα δωμάτιο.');return;}
+ const url='https://seemsfunny21.github.io/applications/?app=tichufunnyonline&room='+roomCode;
+ try{await navigator.clipboard.writeText(url);status('Αντιγράφηκε ο σύνδεσμος δωματίου '+roomCode+'.');}
+ catch(_){prompt('Αντέγραψε τον σύνδεσμο:',url);}
+}
+function makeCard(card,disabled,click,assigned,chosen,glow){
+ const button=document.createElement('button');button.type='button';
+ button.className='card'+(card.key?' special':'')+(card.key==='P'?' phoenix':'')+(red.has(card.suit)?' red':'');
+ if(chosen)button.classList.add('selected');
+ if(assigned)button.classList.add('assigned');
+ if(glow)button.classList.add('straight-glow');
+ const rank=card.key?card.key:(card.rank===14?'A':card.rank===13?'K':card.rank===12?'Q':card.rank===11?'J':String(card.rank));
+ const face=card.key?{M:'麻',D:'🐕',P:'🔥',G:'🐉'}[card.key]:SUITS[card.suit];
+ const top=document.createElement('b');top.textContent=rank;
+ const middle=document.createElement('span');middle.className='center';middle.textContent=face;
+ const foot=document.createElement('small');foot.textContent=card.key?E.label(card):face;
+ button.append(top,middle,foot);button.setAttribute('aria-label',E.label(card));
+ button.disabled=disabled;if(click)button.addEventListener('click',click);return button;
+}
+function sorted(cards){return cards.slice().sort((a,b)=>E.cardRank(a)-E.cardRank(b)||(a.suit??0)-(b.suit??0));}
+function sortedTrick(trick){
+ const cards=trick.cards.map(id=>cardsById.get(id)).filter(Boolean);
+ const combo=trick.combo;
+ if(!['straight','bombStraight','pairs'].includes(combo.type))return cards;
+ const first=combo.value-combo.len+1;
+ const present=new Set(cards.filter(c=>c.key!=='P').map(E.cardRank));
+ let substitute=0;
+ if(combo.type!=='pairs')for(let r=first;r<=combo.value;r++)if(!present.has(r)){substitute=r;break;}
+ return cards.sort((a,b)=>(a.key==='P'?substitute:E.cardRank(a))-(b.key==='P'?substitute:E.cardRank(b)));
+}
+function rankText(r){return r===14?'A':r===13?'K':r===12?'Q':r===11?'J':String(r);}
+function options(){
+ const game=room?.game;if(!game||room.selfSeat<0)return {moves:[],forced:false};
+ return E.options({hands:[game.hand],trick:game.trick,wish:game.wish},0);
+}
+function straightStarting(card){
+ if(!card||card.key==='P'||card.key==='D'||card.key==='G'||!room?.game)return null;
+ const first=E.cardRank(card);
+ const moves=options().moves.filter(m=>(m.combo.type==='straight'||m.combo.type==='bombStraight')&&m.combo.len>=5&&
+  m.combo.value-m.combo.len+1===first&&m.ids.includes(card.id));
+ moves.sort((a,b)=>b.combo.len-a.combo.len||a.combo.bomb-b.combo.bomb);
+ const m=moves[0];
+ return m?{ids:m.ids,start:card.id,label:rankText(first)+'–'+rankText(m.combo.value)}:null;
+}
+function chooseCard(id){
+ if(!room||busy||room.selfSeat<0||!['playing','trade'].includes(room.game?.stage))return;
+ if(room.waiting?.trade)return;
+ if(preview&&preview.ids.includes(id)&&id!==preview.start){selected=new Set(preview.ids);preview=null;render();return;}
+ if(!selected.has(id)&&selected.size===0&&room.game.stage==='playing'){
+  const c=room.game.hand.find(x=>x.id===id);const hint=straightStarting(c);
+  if(hint){preview=hint;selected.add(id);status('✨ Κέντα '+hint.label+' — πάτησε ένα φωτισμένο φύλλο.');render();return;}
  }
- let showing=false;
- const handRoot=$('hand');
- for(const [rank,suit] of hand){
-  const btn=card(rank,suit,rank==='3');
-  if(rank==='3')btn.addEventListener('click',()=>{
-    showing=!showing;
-    for(const el of handRoot.children){
-     const r=el.querySelector('b')?.textContent;
-     el.classList.toggle('straight-glow',showing&&set.has(r));
-     el.classList.toggle('selected',showing&&r==='3');
-    }
-    $('previewNote').textContent=showing?'✨ Δείγμα: τα φύλλα 3–9 σχηματίζουν κέντα.':'Πάτησε το 3 για να δεις το glow της κέντας.';
-  });
-  handRoot.appendChild(btn);
+ preview=null;
+ if(room.game.stage==='trade'&&Object.values(trades).includes(id))
+  for(const k of Object.keys(trades))if(trades[k]===id)delete trades[k];
+ if(selected.has(id))selected.delete(id);
+ else{if(room.game.stage==='trade')selected.clear();selected.add(id);}
+ render();
+}
+function acceptStraight(){if(!preview)return;selected=new Set(preview.ids);preview=null;render();}
+function assignTrade(target){
+ if(selected.size!==1)return;
+ const id=[...selected][0];
+ for(const k of Object.keys(trades))if(trades[k]===id)delete trades[k];
+ trades[String(target)]=id;selected.clear();render();
+}
+function hint(){
+ const moves=options().moves;if(!moves.length){status('Δεν υπάρχει νόμιμη κίνηση.');return;}
+ moves.sort((a,b)=>a.combo.bomb-b.combo.bomb||b.cards.length-a.cards.length||a.combo.value-b.combo.value);
+ selected=new Set(moves[0].ids);preview=null;render();
+ status('💡 Πρόταση: '+moves[0].cards.map(E.label).join(', '));
+}
+async function play(){
+ if(!selected.size||!room?.game||room.selfSeat<0)return;
+ const ids=[...selected],hasMahjong=room.game.hand.some(c=>selected.has(c.id)&&c.key==='M');
+ let wish=null;
+ if(hasMahjong){
+  const response=prompt('Ευχή Mahjong: αριθμός 2 έως 14 (11=J,12=Q,13=K,14=A):','9');
+  if(response===null)return;
+  wish=Number(response);
+  if(!Number.isInteger(wish)||wish<2||wish>14){status('Επίλεξε αριθμό 2–14.');return;}
  }
- for(let i=3;i<=9;i++)$('pot').appendChild(card(String(i),['♠','♥','♣','♦'][i%4],false));
- const menu=$('settingsPanel'),toggle=$('settingsToggle'),input=$('playerName');
- function showSettings(open){menu.hidden=!open;toggle.setAttribute('aria-expanded',open?'true':'false');}
- toggle.addEventListener('click',()=>showSettings(menu.hidden));
- document.addEventListener('click',e=>{if(!menu.hidden&&!e.target.closest('.hero'))showSettings(false);});
- document.addEventListener('keydown',e=>{if(e.key==='Escape')showSettings(false);});
- try{input.value=localStorage.getItem('tichufunnyonline:preview:name')||'';}catch(_){}
- function updateName(){
-  const name=input.value.trim().slice(0,22);
-  $('you').textContent=(name||'Εσύ')+' · 14 φύλλα (δείγμα)';
-  try{localStorage.setItem('tichufunnyonline:preview:name',name);}catch(_){}
+ await perform('play',{ids:ids,wish:wish});
+}
+async function trade(){
+ if(Object.keys(trades).length!==3)return;
+ await perform('trade',{trades:Object.entries(trades).map(([target,id])=>({target:Number(target),id:id}))});
+}
+function actionButton(label,handler,primary,disabled){
+ const b=document.createElement('button');b.type='button';
+ b.textContent=label;b.className='btn'+(primary?' primary':'');
+ b.disabled=!!disabled;b.addEventListener('click',handler);
+ $('controls').appendChild(b);return b;
+}
+function render(){
+ const self=room?.selfSeat??-1,base=self>=0?self:0,g=room?.game;
+ const seatsInRoom=room?.seats||[null,null,null,null];
+ const scores=g?.scores||[0,0],team=self>=0?self%2:0;
+ $('team0').textContent=String(scores[team]);
+ $('team1').textContent=String(scores[1-team]);
+ $('round').textContent=String(g?.round||1);
+ $('roomMarker').textContent=room?'ΔΩΜΑΤΙΟ '+room.code:'TICHU ONLINE';
+ const leader=g?.trick?.player;
+ $('cardTable').classList.toggle('partner-leading',leader!==undefined&&leader!==null&&leader===(base+2)%4);
+ const map={seat1:(base+1)%4,seat2:(base+2)%4,seat3:(base+3)%4,you:base};
+ for(const [id,p] of Object.entries(map)){
+  const el=$(id),s=seatsInRoom[p],free=room?.phase==='lobby'&&!s&&self<0&&p!==0;
+  const my=s&&p===self;
+  el.classList.toggle('leader',leader===p);
+  el.classList.toggle('myseat',!!my);
+  el.classList.toggle('can-sit',free);
+  el.classList.toggle('occupied',!!s);
+  el.classList.toggle('waiting',!s);
+  el.classList.toggle('ai-seat',s?.kind==='ai');
+  el.classList.toggle('trade-target',!!(g?.stage==='trade'&&self>=0&&p!==self&&!room.waiting?.trade&&selected.size===1));
+  const n=s?(my?'Εσύ':s.name):('Θέση '+(p+1));
+  if(id==='you'){
+   el.textContent=n+(g?' · '+g.counts[p]+' φύλλα':' · '+(free?'Κάτσε':'αναμονή'));
+  }else{
+   el.querySelector('strong').textContent=(id==='seat2'?'🤝 ':'')+n;
+   el.querySelector('.count').textContent=free?'✋ Κάτσε':(s?(g?g.counts[p]+' φύλλα':'Έτοιμος'):'Κενή καρέκλα');
+  }
+  el.disabled=!free&&!(g?.stage==='trade'&&self>=0&&p!==self&&!room.waiting?.trade&&selected.size===1);
+  el.onclick=free?()=>sit(p):(g?.stage==='trade'&&self>=0&&p!==self?()=>assignTrade(p):null);
  }
- input.addEventListener('input',updateName);updateName();
+ const owner=$('trickOwner');owner.classList.toggle('hidden',leader===undefined||leader===null);
+ owner.classList.toggle('ally',leader!==undefined&&leader!==null&&(leader%2===base%2));
+ owner.classList.toggle('opponent',leader!==undefined&&leader!==null&&(leader%2!==base%2));
+ owner.textContent=leader===undefined||leader===null?'':leader===(base+2)%4?'🛡️ Προηγείται ο συμπαίκτης':leader===base?'✦ Προηγείσαι εσύ':'⚡ Προηγείται αντίπαλος';
+ const types={single:'Μονό',pair:'Ζευγάρι',triple:'Τριάδα',full:'Φουλ',straight:'Κέντα',pairs:'Συνεχόμενα ζευγάρια',bomb4:'Βόμβα',bombStraight:'Βόμβα κέντας'};
+ const label=$('trickLabel'),pot=$('pot');pot.replaceChildren();
+ pot.classList.toggle('empty',!g?.trick);
+ if(g?.trick){
+  label.textContent=(seatsInRoom[leader]?.name||'Παίκτης')+' · '+(types[g.trick.combo.type]||g.trick.combo.type);
+  for(const c of sortedTrick(g.trick))pot.appendChild(makeCard(c,true,null,false,false,false));
+ }else{
+  label.textContent=!room?'Φτιάξε δωμάτιο ή μπες με κωδικό':room.phase==='lobby'?'Κάτσε σε ελεύθερη καρέκλα':g?.stage==='grand'?'Grand Tichu':g?.stage==='trade'?'Ανταλλαγές':g?.stage==='finished'?'Τέλος γύρου':'Νέα μπάζα';
+  pot.textContent=!room?'Εσύ και οι φίλοι σου · οι κενές θέσεις γίνονται AI':room.phase==='lobby'?'Όταν πατηθεί Εκκίνηση, οι κενές θέσεις γίνονται AI.':g?.stage==='grand'?'Βλέπεις τα πρώτα 8 φύλλα σου.':g?.stage==='trade'?'Δώσε ένα φύλλο σε κάθε άλλον παίκτη.':g?.stage==='finished'?'Ο γύρος τελείωσε.':'Περιμένουμε το πρώτο φύλλο.';
+ }
+ $('tableStatus').textContent=notice||(!room?'Μπες ή δημιούργησε δωμάτιο.':room.phase==='lobby'?'Αναμονή παικτών.':g?.stage==='playing'?(g.turn===self?'Η σειρά σου.':'Περιμένουμε παίκτη…'):'');
+ const hand=$('hand');hand.replaceChildren();
+ for(const c of sorted(g?.hand||[])){
+  const assigned=Object.values(trades).includes(c.id);
+  hand.appendChild(makeCard(c,busy||!(g?.stage==='playing'||g?.stage==='trade'),()=>chooseCard(c.id),assigned,selected.has(c.id),!!preview?.ids.includes(c.id)&&preview.start!==c.id));
+ }
+ const controls=$('controls');controls.replaceChildren();
+ const inRoom=!!room,host=self===0;
+ if(!inRoom){
+  actionButton('＋ Δημιουργία δωματίου',createRoom,true,busy);
+  actionButton('↪ Είσοδος με κωδικό',()=>showSettings(true),false,busy);
+ }else if(room.phase==='lobby'){
+  if(host)actionButton('▶ Εκκίνηση · κενές θέσεις με AI',()=>perform('start',{}),true,busy);
+  else actionButton(self<0?'✋ Κάτσε σε ελεύθερη καρέκλα':'Αναμονή εκκίνησης',()=>{},false,true);
+  actionButton('🔗 Πρόσκληση',share,false,false);
+ }else if(g?.stage==='grand'){
+  if(self>=0&&!room.waiting?.grand){
+   actionButton('Grand Tichu +200',()=>perform('grand',{yes:true}),false,busy);
+   actionButton('Χωρίς Grand',()=>perform('grand',{yes:false}),true,busy);
+  }else actionButton('Αναμονή δηλώσεων Grand',()=>{},false,true);
+ }else if(g?.stage==='trade'){
+  if(self>=0&&!room.waiting?.trade){
+   const labels={seat1:'← Αριστερά',seat2:'↑ Συμπαίκτης',seat3:'Δεξιά →'};
+   for(const id of ['seat1','seat2','seat3']){
+    const target=map[id];
+    actionButton(labels[id]+(trades[target]?' ✓':''),()=>assignTrade(target),false,busy||selected.size!==1);
+   }
+   actionButton('✓ Ανταλλαγή',trade,true,busy||Object.keys(trades).length!==3);
+  }else actionButton('Αναμονή ανταλλαγών',()=>{},false,true);
+ }else if(g?.stage==='playing'){
+  if(preview)actionButton('✨ Κέντα '+preview.label,acceptStraight,true,busy);
+  const isTurn=g.turn===self;
+  const partnerLead=leader===(base+2)%4;
+  const playBtn=actionButton(partnerLead?'⚠ Παίξε — συμπαίκτης':'▶ Παίξε',play,true,busy||!selected.size||self<0);
+  if(partnerLead)playBtn.classList.add('partner-caution');
+  actionButton('Πάσο',()=>perform('pass',{}),false,busy||!isTurn||!g.trick);
+  actionButton('💡 Υπόδειξη',hint,false,busy||!isTurn);
+  if(self>=0&&g.hand?.length===14&&!g.announcements[self])
+   actionButton('Tichu +100',()=>perform('tichu',{}),false,busy);
+ }else if(g?.stage==='finished'){
+  if(host)actionButton('↻ Επόμενος γύρος',()=>perform('next',{}),true,busy);
+  else actionButton('Περιμένουμε τον οικοδεσπότη',()=>{},false,true);
+ }
+ $('createRoom').disabled=busy;
+ $('openRoom').disabled=busy;
+ $('shareRoom').hidden=!room;
+ $('new').hidden=!(room?.phase==='active'&&host);
+ $('leaveRoom').hidden=!(room?.phase==='lobby'&&self>0);
+ $('onlineInfo').textContent=!room?'Δημιούργησε δωμάτιο, κάλεσε φίλους και πάτα Εκκίνηση. Οι κενές καρέκλες γίνονται υπολογιστές.':
+  room.phase==='lobby'?'Κωδικός '+room.code+' · Ο οικοδεσπότης ξεκινά με όσους φίλους κάθονται. Οι υπόλοιποι είναι AI.':
+  'Μικτό παιχνίδι με φίλους και AI · Τα φύλλα κάθε παίκτη είναι ιδιωτικά.';
+}
+async function poll(){
+ if(!active||busy||polling||!roomCode)return;
+ polling=true;
+ try{
+  const next=await call('state',{});
+  if(!room||next.version!==room.version||next.selfSeat!==room.selfSeat)accept(next,false);
+ }catch(err){status('Σύνδεση: '+(err.message||'πρόβλημα'));}
+ finally{polling=false;}
+}
+$('settingsToggle').addEventListener('click',()=>showSettings($('settingsPanel').hidden));
+document.addEventListener('click',e=>{if(!$('settingsPanel').hidden&&!e.target.closest('.hero'))showSettings(false);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')showSettings(false);});
+$('createRoom').addEventListener('click',createRoom);
+$('openRoom').addEventListener('click',openRoom);
+$('shareRoom').addEventListener('click',share);
+$('leaveRoom').addEventListener('click',leave);
+$('new').addEventListener('click',async()=>{
+ if(!confirm('Νέα παρτίδα από την αρχή; Τα σκορ του δωματίου θα μηδενιστούν.'))return;
+ const data=await perform('restart',{});
+ if(data)showSettings(false);
+});
+$('joinCode').addEventListener('keydown',e=>{if(e.key==='Enter')openRoom();});
+$('playerName').addEventListener('input',()=>{
+ try{localStorage.setItem(NAME,$('playerName').value.slice(0,22));}catch(_){}
+});
+let saved={};
+try{saved=JSON.parse(localStorage.getItem(KEY)||'null')||{};$('playerName').value=localStorage.getItem(NAME)||'';}catch(_){}
+const invited=new URLSearchParams(location.search).get('room')?.toUpperCase();
+roomCode=/^[A-HJ-NP-Z2-9]{6}$/.test(invited||'')?invited:(saved.code||'');
+seatToken=roomCode===saved.code?(saved.token||''):'';
+if(roomCode){$('joinCode').value=roomCode;poll();}
+window.addEventListener('message',e=>{
+ if(e.origin!==location.origin)return;
+ if(e.data?.type==='tichufunnyonline:visibility'){active=!!e.data.active;if(active)poll();}
+});
+document.addEventListener('visibilitychange',()=>{active=document.visibilityState==='visible';if(active)poll();});
+setInterval(poll,2200);
+render();
 })();
+
 </script>
 </body>
 </html>
