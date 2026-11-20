@@ -214,6 +214,13 @@ async function handle(body:AnyObject){
   event(r,"Ξεκίνησε ο επόμενος γύρος.");
   return roomView(await commit(row,r),idx);
  }
+ if(action==="restart"){
+  requiresHost(idx);
+  r.game=E.newRound({scores:[0,0],round:0,difficulty:g.difficulty||"normal"});
+  r.grand={};r.trades={};
+  event(r,"Ο οικοδεσπότης ξεκίνησε νέα παρτίδα από το μηδέν.");
+  return roomView(await commit(row,r),idx);
+ }
  if(action==="grand"){
   if(g.stage!=="grand")throw new ApiError("Η δήλωση Grand έκλεισε.");
   if(r.grand[String(idx)]!==undefined)throw new ApiError("Έχεις ήδη απαντήσει.");
