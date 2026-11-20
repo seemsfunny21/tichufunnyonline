@@ -729,6 +729,20 @@
 @media(orientation:portrait) and (max-width:650px){.settings-panel{max-height:calc(100vw - 48px)}.tutorial-details summary{font-size:11px;padding:6px;min-height:28px}.tutorial-content{max-height:min(39vw,180px);font-size:10px}}
 @media(orientation:portrait) and (max-width:360px){.settings-panel{max-height:calc(100vw - 40px)}.tutorial-content{max-height:120px}}
 
+
+/* Direct desktop join without navigating settings; only displayed before joining. */
+.table#cardTable > #controls .quick-room-code{
+ flex:1 1 128px;min-width:100px;max-width:230px;min-height:30px;
+ padding:3px 9px;margin:0;border:1px solid #77bfd1;border-radius:8px;
+ background:#082a44;color:#f2fbff;font-size:12px;
+ letter-spacing:.07em;text-transform:uppercase;outline:none;
+}
+.table#cardTable > #controls .quick-room-code:focus{border-color:#82ffca;box-shadow:0 0 0 2px #58edb04d}
+#joinCode[aria-invalid="true"]{border-color:#ffa56c;box-shadow:0 0 0 1px #ffa56c66}
+@media(orientation:portrait) and (max-width:650px){
+ .table#cardTable > #controls .quick-room-code{min-width:112px;max-width:168px;min-height:26px;padding:2px 6px;font-size:10px}
+}
+
 </style>
 </head>
 <body>
@@ -748,7 +762,7 @@
   <input id="playerName" type="text" maxlength="22" autocomplete="nickname" placeholder="Το όνομά σου">
   <button class="btn primary" id="createRoom" type="button">＋ Δημιουργία δωματίου</button>
   <label for="joinCode">Κωδικός φίλου</label>
-  <input id="joinCode" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ABC123" inputmode="text">
+  <input id="joinCode" type="text" maxlength="260" autocomplete="off" autocapitalize="characters" placeholder="Κωδικός ABC123 ή σύνδεσμος φίλου" inputmode="text">
   <button class="btn" id="openRoom" type="button">↪ Άνοιγμα δωματίου</button>
   <button class="btn" id="shareRoom" type="button" hidden>🔗 Αντιγραφή πρόσκλησης</button>
   <button class="btn warn" id="new" type="button" hidden>↻ Νέα παρτίδα</button>
@@ -836,14 +850,32 @@ async function createRoom(){
  const result=await perform('create',{name:playerName()});
  if(result){$('joinCode').value=result.code;showSettings(false);status('Δώσε τον κωδικό '+result.code+' σε φίλους.');}
 }
-async function openRoom(){
- const c=$('joinCode').value.trim().toUpperCase();
- if(!/^[A-HJ-NP-Z2-9]{6}$/.test(c)){status('Χρειάζεται κωδικός 6 χαρακτήρων.');return;}
+function normalizeRoomCode(raw){
+ const value=String(raw||'').trim();
+ let candidate=value.toUpperCase().replace(/[\s-]+/g,'');
+ if(/^https?:\/\//i.test(value)){
+  try{candidate=(new URL(value).searchParams.get('room')||'').trim().toUpperCase();}
+  catch(_){return '';}
+ }
+ return /^[A-HJ-NP-Z2-9]{6}$/.test(candidate)?candidate:'';
+}
+async function openRoom(raw){
+ const c=normalizeRoomCode(typeof raw==='string'?raw:$('joinCode').value);
+ if(!c){
+  status('Γράψε τον εξαψήφιο κωδικό ή επικόλλησε τον σύνδεσμο πρόσκλησης.');
+  $('joinCode').setAttribute('aria-invalid','true');return;
+ }
+ $('joinCode').setAttribute('aria-invalid','false');
  const prevCode=roomCode,prevToken=seatToken;
  roomCode=c;seatToken=prevCode===c?prevToken:'';
  const data=await perform('state',{},true);
- if(data){showSettings(false);status('Πάτησε «Κάτσε» σε μια ελεύθερη καρέκλα.');}
- else{roomCode=prevCode;seatToken=prevToken;render();}
+ if(data){
+  $('joinCode').value=c;showSettings(false);
+  if(data.phase==='lobby'&&data.selfSeat<0)status('Το δωμάτιο βρέθηκε! Διάλεξε καρέκλα ή πάτησε «✋ Κάτσε».');
+  else if(data.phase==='active'&&data.selfSeat<0)status('Η παρτίδα έχει ήδη ξεκινήσει. Ζήτησε νέο δωμάτιο πριν από την εκκίνηση.');
+  else status('Συνδέθηκες στο δωμάτιο '+c+'.');
+  render();
+ }else{roomCode=prevCode;seatToken=prevToken;render();}
 }
 async function sit(globalSeat){
  if(busy||!room||room.phase!=='lobby'||room.selfSeat>=0||room.seats[globalSeat])return;
@@ -1001,7 +1033,10 @@ function render(){
  }
  $('tableStatus').textContent=room?.paused?
   '⏸ Παύση — περιμένουμε επανασύνδεση ή συνέχεια με AI.':
-  notice||(!room?'Μπες ή δημιούργησε δωμάτιο.':room.phase==='lobby'?'Αναμονή παικτών.':g?.stage==='playing'?(g.turn===self?'Η σειρά σου.':'Περιμένουμε παίκτη…'):'');
+  notice||(!room?'Βάλε κωδικό και πάτησε Είσοδος.':
+   room.phase==='lobby'?(self<0?'Πάτησε Κάτσε σε καρέκλα ή στο πράσινο κουμπί.':'Αναμονή εκκίνησης.'):
+   self<0?'Η παρτίδα έχει ήδη ξεκινήσει. Νέοι παίκτες μπαίνουν πριν την Εκκίνηση.':
+   g?.stage==='playing'?(g.turn===self?'Η σειρά σου.':'Περιμένουμε παίκτη…'):'');
  $('cardTable').classList.toggle('paused',!!room?.paused);
  const hand=$('hand');hand.replaceChildren();
  for(const c of sorted(g?.hand||[])){
@@ -1011,11 +1046,22 @@ function render(){
  const controls=$('controls');controls.replaceChildren();
  const inRoom=!!room,host=self===0;
  if(!inRoom){
-  actionButton('＋ Δημιουργία δωματίου',createRoom,true,busy);
-  actionButton('↪ Είσοδος με κωδικό',()=>showSettings(true),false,busy);
+  actionButton('＋ Δημιουργία',createRoom,true,busy);
+  const input=document.createElement('input');
+  input.type='text';input.id='quickRoomCode';input.className='quick-room-code';
+  input.placeholder='Κωδικός δωματίου';input.autocomplete='off';input.autocapitalize='characters';
+  input.setAttribute('aria-label','Κωδικός δωματίου ή σύνδεσμος πρόσκλησης');
+  input.value=$('joinCode').value||'';
+  input.addEventListener('input',()=>{$('joinCode').value=input.value;});
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void openRoom(input.value);}});
+  controls.appendChild(input);
+  actionButton('↪ Είσοδος',()=>openRoom(input.value),true,busy);
  }else if(room.phase==='lobby'){
   if(host)actionButton('▶ Εκκίνηση · κενές θέσεις με AI',()=>perform('start',{}),true,busy);
-  else actionButton(self<0?'✋ Κάτσε σε ελεύθερη καρέκλα':'Αναμονή εκκίνησης',()=>{},false,true);
+  else if(self<0){
+   const nextFree=room.seats.findIndex((seat,p)=>p>0&&!seat);
+   actionButton('✋ Κάτσε',()=>sit(nextFree),true,busy||nextFree<0);
+  }else actionButton('✓ Κάθισες · περιμένουμε Εκκίνηση',()=>{},false,true);
   actionButton('🔗 Πρόσκληση',share,false,false);
   }else if(room.paused){
   const offlineSeats=room.missingSeats||[];
