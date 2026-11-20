@@ -1108,18 +1108,22 @@ function render(){
   room.paused?'⏸ Το παιχνίδι έχει αποθηκευτεί. Ο φίλος μπορεί να επιστρέψει ή να επιλέξετε AI.':
   'Μικτό παιχνίδι με φίλους και AI · Τα φύλλα κάθε παίκτη είναι ιδιωτικά.';
 }
-/* Only a room with multiple human participants needs frequent updates.
-   Lobby = 12s, live multiplayer = 5-7s, paused = 14s, hidden = zero.
-   Human-vs-AI alone works from immediate action responses without polling. */
+/* Responsive while people play; economical when no other human
+   is present. All timings are seconds, not a permanent SQL loop.
+   - Lobby: 2.5 s to show friends sitting down
+   - Multiplayer play: 1.6 s to show friends' cards quickly
+   - Grand/trade: 2 s; paused: 3.5 s; finished: 8 s
+   - Solo vs AI and hidden app: 0 repeated requests
+   Actions always update immediately from their server response. */
 function pollDelay(){
  if(!active||!roomCode)return 0;
- if(!room)return 8_000;
- if(room.phase==='lobby')return 12_000;
+ if(!room)return 2_500;
+ if(room.phase==='lobby')return 2_500;
  const humans=room.seats.filter(seat=>seat?.kind==='human').length;
  if(humans<=1)return 0;
- if(room.paused)return 14_000;
- if(room.game?.stage==='finished')return 16_000;
- return ['grand','trade'].includes(room.game?.stage)?7_000:5_000;
+ if(room.paused)return 3_500;
+ if(room.game?.stage==='finished')return 8_000;
+ return ['grand','trade'].includes(room.game?.stage)?2_000:1_600;
 }
 function schedulePoll(override){
  if(pollTimer!==null){clearTimeout(pollTimer);pollTimer=null;}
