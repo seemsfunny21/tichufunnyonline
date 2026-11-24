@@ -151,7 +151,7 @@ function play(g,p,ids,wishNum){
  if(cards.length!==ids.length)return {ok:false,reason:'Επίλεξε έγκυρα φύλλα.'};
  const combo=evaluate(cards,g.trick?.combo||null);
  if(!combo)return {ok:false,reason:'Αυτός ο συνδυασμός δεν επιτρέπεται.'};
- if(p!==g.turn&&!combo.bomb)return {ok:false,reason:'Περίμενε τη σειρά σου.'};
+ if(p!==g.turn&&(!combo.bomb||!g.trick))return {ok:false,reason:'Περίμενε τη σειρά σου.'};
  const opts=options(g,p);
  if(opts.forced&&!cards.some(c=>c.rank===g.wish))return {ok:false,reason:'Πρέπει να παίξεις τον αριθμό που ζητήθηκε: '+g.wish};
  if(combo.type==='dog'&&g.trick)return {ok:false,reason:'Ο σκύλος παίζεται μόνο όταν ξεκινάς μπάζα.'};
